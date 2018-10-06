@@ -62,8 +62,6 @@ bn_types = (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)
 default_device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 AdamW = partial(optim.Adam, betas=(0.9,0.99))
 
-def tensor(x): return x if isinstance(x,Tensor) else torch.tensor(x)
-
 def to_data(b:ItemsList):
     "Recursively map lists of items in `b ` to their wrapped data"
     if is_listy(b): return [to_data(o) for o in b]
@@ -182,8 +180,106 @@ def in_channels(m:Model) -> List[int]:
 
 def calc_loss(y_pred:Tensor, y_true:Tensor, loss_class:type=nn.CrossEntropyLoss, bs=64):
     "Calculate loss between `y_pred` and `y_true` using `loss_class` and `bs`."
-    loss_dl = DataLoader(TensorDataset(tensor(y_pred),tensor(y_true)), bs)
+    loss_dl = DataLoader(TensorDataset(as_tensor(y_pred),as_tensor(y_true)), bs)
     with torch.no_grad():
         return torch.cat([loss_class(reduction='none')(*b) for b in loss_dl])
 
 def to_np(x): return x.cpu().numpy()
+
+def model_type(dtype):
+    return (torch.float32 if np.issubdtype(dtype, np.floating) else
+            torch.int64 if np.issubdtype(dtype, np.integer)
+            else None)
+
+def np2model_tensor(a):
+    dtype = model_type(a.dtype)
+    res = as_tensor(a)
+    if not dtype: return res
+    return res.type(dtype)
+
+def show_install(show_nvidia_smi:bool=False):
+    "Print user's setup information: python -c 'import fastai; fastai.show_install()'"
+
+    import platform, fastai.version, subprocess
+
+    print("\n```")
+
+    print(f"platform info  : {platform.platform()}")
+
+    opt_mods = []
+
+    if platform.system() == 'Linux':
+        try:
+            import distro
+        except ImportError:
+            opt_mods.append('distro');
+            # partial distro info
+            print(f"distro version : {platform.uname().version}")
+        else:
+            # full distro info
+            print(f"distro info    : {' '.join(distro.linux_distribution())}")
+
+    print(f"python version : {platform.python_version()}")
+    print(f"fastai version : {fastai.__version__}")
+    print(f"torch version  : {torch.__version__}")
+
+    # cuda
+    cmd = "nvidia-smi"
+    have_nvidia_smi = False
+    try:
+        result = subprocess.run(cmd.split(), shell=False, check=False, stdout=subprocess.PIPE)
+    except:
+        pass
+    else:
+        if result.returncode == 0 and result.stdout:
+            have_nvidia_smi = True
+
+    if have_nvidia_smi:
+        smi = result.stdout.decode('utf-8')
+        match = re.findall(r'Driver Version: +(\d+\.\d+)', smi)
+        if match: print(f"nvidia driver  : {match[0]}")
+
+    cuda_is_available = torch.cuda.is_available()
+    if not cuda_is_available: print(f"cuda available : False")
+
+    print(f"cuda version   : {torch.version.cuda}")
+    print(f"cudnn version  : {torch.backends.cudnn.version()}")
+    print(f"cudnn available: {torch.backends.cudnn.enabled}")
+
+    gpu_cnt = torch.cuda.device_count()
+    print(f"torch gpu count: {gpu_cnt}")
+
+    # it's possible that torch might not see what nvidia-smi sees?
+    gpu_total_mem = []
+    if have_nvidia_smi:
+        try:
+            cmd = "nvidia-smi --query-gpu=memory.total --format=csv,nounits,noheader"
+            result = subprocess.run(cmd.split(), shell=False, check=False, stdout=subprocess.PIPE)
+        except:
+            print("have nvidia-smi, but failed to query it")
+        else:
+            if result.returncode == 0 and result.stdout:
+                output = result.stdout.decode('utf-8')
+                gpu_total_mem = [int(x) for x in output.strip().split('\n')]
+
+    # information for each gpu
+    for i in range(gpu_cnt):
+        print(f"  [gpu{i}]")
+        print(f"  name         : {torch.cuda.get_device_name(i)}")
+        if gpu_total_mem: print(f"  total memory : {gpu_total_mem[i]}MB")
+
+    if have_nvidia_smi:
+        if show_nvidia_smi == True: print(f"\n{smi}")
+    else:
+        if gpu_cnt:
+            # have gpu, but no nvidia-smi
+            print(f"no nvidia-smi is found")
+        else:
+            print(f"no supported gpus found on this system")
+
+    print("```\n")
+
+    if opt_mods:
+        print("Optional package(s) to enhance the diagnostics can be installed with:")
+        print(f"pip install {' '.join(opt_mods)}")
+        print("Once installed, re-run this utility to get the additional information")

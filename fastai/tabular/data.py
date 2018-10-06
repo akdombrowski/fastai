@@ -22,7 +22,7 @@ class TabularDataset(DatasetBase):
     def __init__(self, df:DataFrame, dep_var:str, cat_names:OptStrList=None, cont_names:OptStrList=None,
                  stats:OptStats=None, log_output:bool=False):
         if not is_numeric_dtype(df[dep_var]): df[dep_var] = df[dep_var].cat.codes
-        self.y = torch.tensor(df[dep_var].values)
+        self.y = np2model_tensor(df[dep_var].values)
         if log_output: self.y = torch.log(self.y.float())
         n = len(self.y)
         if cat_names and len(cat_names) >= 1:
@@ -76,14 +76,17 @@ def tabular_data_from_df(path, train_df:DataFrame, valid_df:DataFrame, dep_var:s
     valid_ds = TabularDataset.from_dataframe(valid_df, dep_var, train_ds.tfms, train_ds.cat_names,
                                              train_ds.cont_names, train_ds.stats, log_output)
     datasets = [train_ds, valid_ds]
-    if test_df:
-        datasets.append(TabularDataset.from_dataframe(valid_df, dep_var, train_ds.tfms, train_ds.cat_names,
+    if test_df is not None:
+        datasets.append(TabularDataset.from_dataframe(test_df, dep_var, train_ds.tfms, train_ds.cat_names,
                                                       train_ds.cont_names, train_ds.stats, log_output))
     return DataBunch.create(*datasets, path=path, **kwargs)
 
-def get_tabular_learner(data:DataBunch, layers:Collection[int], emb_szs:Dict[str,int]=None, metrics=None, **kwargs):
+
+
+def get_tabular_learner(data:DataBunch, layers:Collection[int], emb_szs:Dict[str,int]=None, metrics=None,
+        ps:Collection[float]=None, emb_drop:float=0., y_range:OptRange=None, use_bn:bool=True, **kwargs):
     "Get a `Learner` using `data`, with `metrics`, including a `TabularModel` created using the remaining params."
     emb_szs = data.get_emb_szs(ifnone(emb_szs, {}))
-    model = TabularModel(emb_szs, len(data.cont_names), out_sz=data.c, layers=layers, **kwargs)
-    return Learner(data, model, metrics=metrics)
+    model = TabularModel(emb_szs, len(data.cont_names), out_sz=data.c, layers=layers)
+    return Learner(data, model, metrics=metrics, **kwargs)
 

@@ -1,5 +1,5 @@
 package:
-  name: torchvision-nightly
+  name: torchvision-nightly-cpu
   version: 0.2.1
 
 source:
@@ -20,7 +20,7 @@ requirements:
     - numpy >=1.11
     - pillow >=4.1.1
     - six
-    - pytorch-nightly
+    - pytorch-nightly-cpu
 
 test:
   imports:

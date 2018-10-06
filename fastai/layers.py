@@ -46,11 +46,11 @@ def conv_layer(ni:int, nf:int, ks:int=3, stride:int=1)->nn.Sequential:
         nn.BatchNorm2d(nf),
         nn.LeakyReLU(negative_slope=0.1, inplace=True))
 
-def conv2d_relu(ni:int, nf:int, ks:int=3, stride:int=1,
-                padding:int=None, bn:bool=False) -> nn.Sequential:
+def conv2d_relu(ni:int, nf:int, ks:int=3, stride:int=1, padding:int=None, bn:bool=False,
+                bias:bool=False) -> nn.Sequential:
     """Create a `conv2d` layer with `nn.ReLU` activation and optional(`bn`) `nn.BatchNorm2d`: `ni` input, `nf` out 
     filters, `ks` kernel, `stride`:stride, `padding`:padding, `bn`: batch normalization."""
-    layers = [conv2d(ni, nf, ks=ks, stride=stride, padding=padding), nn.ReLU()]
+    layers = [conv2d(ni, nf, ks=ks, stride=stride, padding=padding, bias=bias), nn.ReLU()]
     if bn: layers.append(nn.BatchNorm2d(nf))
     return nn.Sequential(*layers)
 
@@ -104,7 +104,7 @@ def simple_cnn(actns:Collection[int], kernel_szs:Collection[int]=None,
     kernel_szs = ifnone(kernel_szs, [3]*nl)
     strides    = ifnone(strides   , [2]*nl)
     layers = [conv2d_relu(actns[i], actns[i+1], kernel_szs[i], stride=strides[i])
-        for i in range(len(strides))]
+        for i in range_of(strides)]
     layers.append(PoolFlatten())
     return nn.Sequential(*layers)
 

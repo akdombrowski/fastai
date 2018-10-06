@@ -5,15 +5,11 @@ from .callback import *
 
 __all__ = ['Learner', 'LearnerCallback', 'Recorder', 'fit', 'loss_batch', 'train_epoch', 'validate', 'default_lr', 'default_wd']
 
-OptCallbackHandler = Optional[CallbackHandler]
-CallbackList = Collection[Callback]
-OptCallbackList = Optional[CallbackList]
-
 default_lr = slice(3e-3)
 default_wd = 1e-2
 
 def loss_batch(model:Model, xb:Tensor, yb:Tensor, loss_fn:OptLossFunc=None,
-               opt:OptOptimizer=None, cb_handler:OptCallbackHandler=None,
+               opt:OptOptimizer=None, cb_handler:Optional[CallbackHandler]=None,
                metrics:OptMetrics=None)->Tuple[Union[Tensor,int,float,str]]:
     "Calculate loss and metrics for a batch, call out to callbacks as necessary."
     if cb_handler is None: cb_handler = CallbackHandler([])
@@ -37,7 +33,7 @@ def loss_batch(model:Model, xb:Tensor, yb:Tensor, loss_fn:OptLossFunc=None,
 
 
 def validate(model:Model, dl:DataLoader, loss_fn:OptLossFunc=None,
-             metrics:OptMetrics=None, cb_handler:OptCallbackHandler=None,
+             metrics:OptMetrics=None, cb_handler:Optional[CallbackHandler]=None,
              pbar:Optional[PBar]=None)->Iterator[Tuple[Union[Tensor,int],...]]:
     "Calculate loss and metrics for the validation set."
     model.eval()
@@ -55,7 +51,7 @@ def train_epoch(model:Model, dl:DataLoader, opt:optim.Optimizer, loss_func:LossF
         opt.zero_grad()
 
 def fit(epochs:int, model:Model, loss_fn:LossFunction, opt:optim.Optimizer,
-        data:DataBunch, callbacks:OptCallbackList=None, metrics:OptMetrics=None)->None:
+        data:DataBunch, callbacks:Optional[CallbackList]=None, metrics:OptMetrics=None)->None:
     "Fit the `model` on `data` and learn using `loss` and `opt`."
     cb_handler = CallbackHandler(callbacks)
     pbar = master_bar(range(epochs))
@@ -179,6 +175,7 @@ class LearnerCallback(Callback):
 
 class Recorder(LearnerCallback):
     "A `LearnerCallback` that records epoch, loss, opt and metric data during training."
+    _order=-10
     def __init__(self, learn:Learner):
         super().__init__(learn)
         self.opt = self.learn.opt
@@ -224,7 +221,7 @@ class Recorder(LearnerCallback):
 
     def plot_lr(self, show_moms=False)->None:
         "Plot learning rate, `show_moms` to include momentum."
-        iterations = list(range(len(self.lrs)))
+        iterations = range_of(self.lrs)
         if show_moms:
             _, axs = plt.subplots(1,2, figsize=(12,4))
             axs[0].plot(iterations, self.lrs)
@@ -242,7 +239,7 @@ class Recorder(LearnerCallback):
     def plot_losses(self)->None:
         "Plot training and validation losses."
         _, ax = plt.subplots(1,1)
-        iterations = list(range(len(self.losses)))
+        iterations = range_of(self.losses)
         ax.plot(iterations, self.losses)
         val_iter = self.nb_batches
         val_iter = np.cumsum(val_iter)
