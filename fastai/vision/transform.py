@@ -3,7 +3,7 @@ from ..torch_core import *
 from .image import *
 from .image import _affine_mult
 
-_all__ = ['brightness', 'contrast', 'crop', 'crop_pad', 'dihedral', 'flip_lr', 'get_transforms',
+__all__ = ['brightness', 'contrast', 'crop', 'crop_pad', 'dihedral', 'flip_lr', 'get_transforms',
           'jitter', 'pad', 'perspective_warp', 'rand_pad', 'rand_crop', 'rand_zoom', 'rotate', 'skew', 'squish',
           'rand_resize_crop', 'symmetric_warp', 'tilt', 'zoom', 'zoom_crop']
 
@@ -175,7 +175,7 @@ def tilt(c, img_size, direction:uniform_int, magnitude:uniform=0):
     elif direction == 1: targ_pts = [[-1,-1-magnitude], [-1,1+magnitude], [1,-1], [1,1]]
     elif direction == 2: targ_pts = [[-1,-1], [-1-magnitude,1], [1,-1], [1+magnitude,1]]
     elif direction == 3: targ_pts = [[-1-magnitude,-1], [-1,1], [1+magnitude,-1], [1,1]]
-    coeffs = _find_coeffs(orig_pts, targ_pts)
+    coeffs = _find_coeffs(_orig_pts, targ_pts)
     return _apply_perspective(c, coeffs)
 
 @TfmCoord
@@ -190,7 +190,7 @@ def skew(c, img_size, direction:uniform_int, magnitude:uniform=0):
     elif direction == 5: targ_pts = [[-1,-1], [-1,1], [1,-1-magnitude], [1,1]]
     elif direction == 6: targ_pts = [[-1,-1], [-1,1], [1,-1], [1+magnitude,1]]
     elif direction == 7: targ_pts = [[-1,-1], [-1,1], [1,-1], [1,1+magnitude]]
-    coeffs = _find_coeffs(orig_pts, targ_pts)
+    coeffs = _find_coeffs(_orig_pts, targ_pts)
     return _apply_perspective(c, coeffs)
 
 def get_transforms(do_flip:bool=True, flip_vert:bool=False, max_rotate:float=10., max_zoom:float=1.1,

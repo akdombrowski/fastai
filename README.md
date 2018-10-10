@@ -1,3 +1,11 @@
+[![Build Status](https://dev.azure.com/fastdotai/fastai/_apis/build/status/fastai.fastai)](https://dev.azure.com/fastdotai/fastai/_build/latest?definitionId=1)
+[![fastai version](https://img.shields.io/pypi/v/fastai.svg)](https://pypi.python.org/pypi/fastai)
+[![Anaconda-Server Badge](https://anaconda.org/fastai/fastai/badges/version.svg)](https://anaconda.org/fastai/fastai)
+
+[![Anaconda-Server Badge](https://anaconda.org/fastai/fastai/badges/platforms.svg)](https://anaconda.org/fastai/fastai)
+[![fastai python compatibility](https://img.shields.io/pypi/pyversions/fastai.svg)](https://pypi.python.org/pypi/fastai)
+[![fastai license](https://img.shields.io/pypi/l/fastai.svg)](https://pypi.python.org/pypi/fastai)
+
 # fastai
 
 The fastai library simplifies training fast and accurate neural nets using modern best practices. See the [fastai website](http://docs.fast.ai) to get started. The library is based on research in to deep learning best practices undertaken at [fast.ai](http://www.fast.ai), and includes \"out of the box\" support for [`vision`](http://docs.fast.ai/vision.html#vision), [`text`](http://docs.fast.ai/text.html#text), [`tabular`](http://docs.fast.ai/tabular.html#tabular), and [`collab`](http://docs.fast.ai/collab.html#collab) (collaborative filtering) models. For brief examples, see the [examples](https://github.com/fastai/fastai/tree/master/examples) folder; detailed examples are provided in the full documentation. For instance, here's how to train an MNIST model using [resnet18](https://arxiv.org/abs/1512.03385) (from the [vision example](https://github.com/fastai/fastai/blob/master/examples/vision.ipynb)):
@@ -11,7 +19,7 @@ learn.fit(1)
 
 ## Note for [course.fast.ai](http://course.fast.ai) students
 
-If you are using fastai for any [course.fast.ai](http://course.fast.ai) course, please do *NOT* install fastai from pip or conda using the instructions below; the instructions below are for fastai v1, but the courses use fastai 0.7. For the courses, you should simply follow the instructions in the course (i.e. clone this repo, cd to it, and `conda env update`; if using your own GPU on Windows, which isn't recommended for beginners, follow [this guide](http://forums.fast.ai/t/howto-installation-on-windows/10439). There is a symlink to old/fastai/ (which is fastai 0.7) in each course notebook directory), or else use `pip install fastai==0.7.0` to install the version compatible with the course.
+If you are using `fastai` for any [course.fast.ai](http://course.fast.ai) course, you need to use `fastai 0.7.x`. Please ignore the rest of this document, which is written for `fastai 1.0.x`, and instead follow the installation instructions [here](http://forums.fast.ai/t/fastai-v0-install-issues-thread/24652).
 
 *Note: If you want to learn how to use fastai v1 from its lead developer, Jeremy Howard, he will be teaching it in the [Deep Learning Part I](https://www.usfca.edu/data-institute/certificates/deep-learning-part-one) course at the University of San Francisco from Oct 22nd, 2018.*
 
@@ -55,7 +63,7 @@ Follow the following 2 steps in this exact order:
    conda install -c fastai fastai
    ```
 
-If you experience installation problems, please read about [installation issues](README.md#installation-issues).
+If you experience installation problems, please read about [installation issues](https://github.com/fastai/fastai/blob/master/README.md#installation-issues).
 
 ### PyPI Install
 
@@ -89,7 +97,7 @@ Follow the following 2 steps in this exact order:
 
    NB: this will also fetch `torchvision-nightly`, which supports `torch-1.x`.
 
-If you experience installation problems, please read about [installation issues](README.md#installation-issues).
+If you experience installation problems, please read about [installation issues](https://github.com/fastai/fastai/blob/master/README.md#installation-issues).
 
 
 ### Developer Install
@@ -125,7 +133,7 @@ Please refer to [CONTRIBUTING.md](https://github.com/fastai/fastai/blob/master/C
 
 ## Installation Issues
 
-If the installation process fails, first make sure [your system is supported](README.md#is-my-system-supported). And if the problem is still not addressed, please see  [this installation issues thread](http://forums.fast.ai/t/fastai-v1-install-issues-thread/24111).
+If the installation process fails, first make sure [your system is supported](https://github.com/fastai/fastai/blob/master/README.md#is-my-system-supported). And if the problem is still not addressed, please see  [this installation issues thread](http://forums.fast.ai/t/fastai-v1-install-issues-thread/24111).
 
 If you encounter installation problems with conda, make sure you have the latest `conda` client:
 ```

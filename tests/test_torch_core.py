@@ -1,12 +1,11 @@
-import pytest, torch, fastai
-
-from fastai import torch_core
+import pytest, torch, re, fastai
+from fastai.torch_core import *
 
 def test_show_install(capsys):
-    fastai_version_check = f"fastai version : {fastai.__version__}"
-    torch_version_check  = f"torch version  : {torch.__version__}"
-    torch_core.show_install()
+    show_install()
     captured = capsys.readouterr()
     #print(captured.out)
-    assert fastai_version_check in captured.out
-    assert torch_version_check  in captured.out
+    match = re.findall(rf'fastai\s+: {fastai.__version__}', captured.out)
+    assert match
+    match = re.findall(rf'torch\s+: {torch.__version__}',   captured.out)
+    assert match

@@ -1,5 +1,23 @@
 # Testing fastai
 
+<!--ts-->
+
+Table of Contents
+-----------------
+
+   * [Testing fastai](#testing-fastai)
+      * [Table of Contents](#table-of-contents)
+      * [Notebook integration tests](#notebook-integration-tests)
+      * [Automated tests](#automated-tests)
+         * [Choosing which tests to run](#choosing-which-tests-to-run)
+         * [To GPU or not to GPU](#to-gpu-or-not-to-gpu)
+         * [Report each sub-test name and its progress](#report-each-sub-test-name-and-its-progress)
+         * [Output capture](#output-capture)
+         * [Color control](#color-control)
+         * [Sending test report to online pastebin service](#sending-test-report-to-online-pastebin-service)
+   * [Writing Tests](#writing-tests)
+<!--te-->
+
 ## Notebook integration tests
 
 Currently we have few automated tests, so most testing is through integration tests done in Jupyter Notebooks. The two places you should check for notebooks to test your code with are:
@@ -58,16 +76,55 @@ it will first select `test_listify` and `test_listy`, and then deselect `test_li
 
 More ways: https://docs.pytest.org/en/latest/usage.html
 
+For nuances of configuring pytest's repo-wide behavior see [collection](https://docs.pytest.org/en/latest/example/pythoncollection.html).
+
 
 
 ### To GPU or not to GPU
 
 
-On a GPU-enabled setup, to test in CPU-only mode add `CUDA_VISIBLE_DEVICES=" "`:
+On a GPU-enabled setup, to test in CPU-only mode add `CUDA_VISIBLE_DEVICES=""`:
+   ```
+   CUDA_VISIBLE_DEVICES="" pytest tests/test_vision.py
+   ```
+
+To do the same inside the code of the test:
+   ```
+   fastai.torch_core.default_device = torch.device('cpu')
+   ```
+
+To switch back to cuda:
+   ```
+   fastai.torch_core.default_device = torch.device('cuda')
+   ```
+
+Make sure you don't hard-code any specific device ids in the test, since different users may have a different GPU setup. So avoid code like:
+   ```
+   fastai.torch_core.default_device = torch.device('cuda:1')
+   ```
+which tells `torch` to use the 2nd GPU. Instead, if you'd like to run a test locally on a different GPU, use the `CUDA_VISIBLE_DEVICES` environment variable:
+   ```
+   CUDA_VISIBLE_DEVICES="1" pytest tests/test_vision.py
+   ```
+
+
+
+### Report each sub-test name and its progress
+
+For a single or a group of tests via `pytest` (after `pip install pytest-pspec`):
 
    ```
-   CUDA_VISIBLE_DEVICES=" "  py.test tests/test_vision.py
+   pytest --pspec tests/test_fastai.py
+   pytest --pspec tests
    ```
+
+For all tests via `setup.py`:
+
+   ```
+   python setup.py test --addopts="--pspec"
+   ```
+
+This also means that meaningful names for each sub-test are important.
 
 
 ### Output capture
@@ -78,6 +135,12 @@ To disable capturing and get the output normally use `-s` or `--capture=no`:
 
    ```
    pytest -s tests/test_core.py
+   ```
+
+To send test results to JUnit format output:
+
+   ```
+   py.test tests --junitxml=result.xml
    ```
 
 
@@ -111,4 +174,6 @@ Creating a URL for a whole test session log:
 
 # Writing Tests
 
-XXX: Needs to be written
+XXX: Needs to be written. Contributions are welcome.
+
+Until then look at the existing tests.

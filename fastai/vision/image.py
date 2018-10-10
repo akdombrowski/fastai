@@ -4,10 +4,9 @@ from ..data import *
 from io import BytesIO
 import PIL
 
-_all__ = ['Image', 'ImageBBox', 'ImageBase', 'ImageMask', 'RandTransform', 'TfmAffine', 'TfmCoord', 'TfmCrop', 'TfmLighting',
-           'TfmPixel', 'Transform', 'affine_grid', 'affine_mult', 'apply_tfms', 'bb2hw', 'get_crop_target', 'get_default_args',
-           'get_resize_target', 'grid_sample', 'image2np', 'log_uniform', 'logit', 'logit_', 'pil2tensor', 'rand_bool', 'rand_crop',
-           'resolve_tfms', 'round_multiple', 'show_image', 'uniform', 'uniform_int']
+__all__ = ['Image', 'ImageBBox', 'ImageBase', 'ImageMask', 'RandTransform', 'TfmAffine', 'TfmCoord', 'TfmCrop', 'TfmLighting',
+           'TfmPixel', 'Tfms', 'Transform', 'apply_tfms', 'bb2hw', 'image2np', 'log_uniform', 'logit', 'logit_', 'open_image',
+           'open_mask', 'pil2tensor', 'rand_bool', 'uniform', 'uniform_int']
 
 def logit(x:Tensor)->Tensor:  return -(1/x-1).log()
 def logit_(x:Tensor)->Tensor: return (x.reciprocal_().sub_(1)).log_().neg_()
@@ -222,7 +221,8 @@ class ImageBBox(ImageMask):
 
     def clone(self):
         bbox = self.__class__(self.px.clone())
-        bbox.labels,bbox.pad_idx = self.labels.clone(),self.pad_idx
+        bbox.labels = self.labels.clone() if self.labels is not None else None
+        bbox.pad_idx = self.pad_idx
         return bbox
     
     @classmethod
@@ -269,7 +269,8 @@ def open_image(fn:PathOrStr)->Image:
 
 def open_mask(fn:PathOrStr)->ImageMask:
     "Return `ImageMask` object create from mask in file `fn`."
-    return ImageMask(pil2tensor(PIL.Image.open(fn)).float())
+    x = PIL.Image.open(fn).convert('L')
+    return ImageMask(pil2tensor(x).float())
 
 def _show_image(img:Image, ax:plt.Axes=None, figsize:tuple=(3,3), hide_axis:bool=True, cmap:str='binary',
                 alpha:float=None)->plt.Axes:
@@ -358,7 +359,7 @@ def _resolve_tfms(tfms:TfmList):
     "Resolve every tfm in `tfms`."
     for f in listify(tfms): f.resolve()
 
-def _grid_sample(x:TensorImage, coords:FlowField, mode:str='bilinear', padding_mode:str='reflection')->TensorImage:
+def _grid_sample(x:TensorImage, coords:FlowField, mode:str='bilinear', padding_mode:str='reflection', **kwargs)->TensorImage:
     "Grab pixels in `coords` from `input` sampling by `mode`. `paddding_mode` is reflection, border or zeros."
     coords = coords.permute(0, 3, 1, 2).contiguous().permute(0, 2, 3, 1) # optimize layout for grid_sample
     return F.grid_sample(x[None], coords, mode=mode, padding_mode=padding_mode)[0]

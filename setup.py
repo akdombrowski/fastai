@@ -33,7 +33,7 @@ def to_list(buffer): return list(filter(None, map(str.strip, buffer.splitlines()
 # XXX: require torch>=1.0.0 once it's released, for now get the user to install it explicitly
 # XXX: using a workaround for torchvision, once torch-1.0.0 is out and a new torchvision depending on it is released switch to torchvision>=0.2.2
 requirements = to_list("""
-    fastprogress>=0.1.9
+    fastprogress>=0.1.10
     ipython
     jupyter
     matplotlib
@@ -84,7 +84,6 @@ setup_requirements = to_list("""
 ### test dependencies ###
 test_requirements = to_list("""
     pytest
-    pytest-pspec
 """)
 
 # list of classifiers: https://pypi.org/pypi?%3Aaction=list_classifiers

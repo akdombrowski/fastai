@@ -40,8 +40,20 @@ def convert_nb(fname, dest_path='.'):
     with open(f'{dest_path}/{dest_name}','w') as f:
         f.write(exporter.from_notebook_node(nb, resources=meta_jekyll)[0])
 
-def convert_all(folder, dest_path='.'):
-    "Convert all notebooks in `folder` to html pages in `dest_path`."
+def convert_all(folder, dest_path='.', force_all=False):
+    "Convert modified notebooks in `folder` to html pages in `dest_path`."
     path = Path(folder)
-    nb_files = path.glob('*.ipynb')
-    for file in nb_files: convert_nb(file, dest_path=dest_path)
+
+    changed_cnt = 0
+    for fname in path.glob("*.ipynb"):
+        # only rebuild modified files
+        fname_out = dest_path/fname.with_suffix('.html')
+        if not force_all and fname_out.exists():
+            in_mod  = os.path.getmtime(fname)
+            out_mod = os.path.getmtime(fname_out)
+            if in_mod < out_mod: continue
+
+        print(f"converting: {fname} => {fname_out}")
+        changed_cnt += 1
+        convert_nb(fname, dest_path=dest_path)
+    if not changed_cnt: print("No notebooks were modified")

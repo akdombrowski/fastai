@@ -1,5 +1,22 @@
 # fastai Style Guide
 
+<!--ts-->
+
+Table of Contents
+-----------------
+
+   * [fastai Style Guide](#fastai-style-guide)
+      * [Table of Contents](#table-of-contents)
+      * [Jeremy's notes on fastai coding style](#jeremys-notes-on-fastai-coding-style)
+      * [Style guide](#style-guide)
+         * [Symbol naming](#symbol-naming)
+         * [Layout](#layout)
+         * [Algorithms](#algorithms)
+         * [Other stuff](#other-stuff)
+         * [Documentation](#documentation)
+      * [FAQ](#faq)
+<!--te-->
+
 ## Jeremy's notes on fastai coding style
 
 This is a brief discussion of fastai's coding style, which is loosely informed by (a much diluted version of) the ideas developed over the last 60 continuous years of development in the [APL](https://en.wikipedia.org/wiki/APL_\(programming_language\)) / [J](https://en.wikipedia.org/wiki/J_\(programming_language\)) / [K](https://en.wikipedia.org/wiki/K_\(programming_language\)) programming communities, along with Jeremy's personal experience contributing to programming language design and library development over the last 25 years. The style is particularly designed to be aligned with the needs of scientific programming and iterative, experimental development.
