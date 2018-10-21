@@ -69,9 +69,9 @@ class EmbeddingDropout(nn.Module):
         return F.embedding(words, masked_embed, self.pad_idx, self.emb.max_norm,
                            self.emb.norm_type, self.emb.scale_grad_by_freq, self.emb.sparse)
 
-def _repackage_var(h:Tensors) -> Tensors:
-    "Detach h from its history."
-    return h.detach() if type(h) == torch.Tensor else tuple(_repackage_var(v) for v in h)
+#def _repackage_var(h:Tensors) -> Tensors:
+#    "Detach h from its history."
+#    return h.detach() if type(h) == torch.Tensor else tuple(_repackage_var(v) for v in h)
 
 class RNNCore(nn.Module):
     "AWD-LSTM/QRNN inspired by https://arxiv.org/abs/1708.02182."
@@ -92,13 +92,11 @@ class RNNCore(nn.Module):
             self.rnns = [QRNNLayer(emb_sz if l == 0 else n_hid, (n_hid if l != n_layers - 1 else emb_sz)//self.ndir,
                                    save_prev_x=True, zoneout=0, window=2 if l == 0 else 1, output_gate=True,
                                    use_cuda=torch.cuda.is_available()) for l in range(n_layers)]
-            if weight_p != 0.:
-                for rnn in self.rnns:
-                    rnn.linear = WeightDropout(rnn.linear, weight_p, layer_names=['weight'])
+            for rnn in self.rnns: rnn.linear = WeightDropout(rnn.linear, weight_p, layer_names=['weight'])
         else:
             self.rnns = [nn.LSTM(emb_sz if l == 0 else n_hid, (n_hid if l != n_layers - 1 else emb_sz)//self.ndir,
                 1, bidirectional=bidir) for l in range(n_layers)]
-            if weight_p != 0.: self.rnns = [WeightDropout(rnn, weight_p) for rnn in self.rnns]
+            self.rnns = [WeightDropout(rnn, weight_p) for rnn in self.rnns]
         self.rnns = torch.nn.ModuleList(self.rnns)
         self.encoder.weight.data.uniform_(-self.initrange, self.initrange)
         self.input_dp = RNNDropout(input_p)
@@ -117,7 +115,7 @@ class RNNCore(nn.Module):
             raw_outputs.append(raw_output)
             if l != self.n_layers - 1: raw_output = hid_dp(raw_output)
             outputs.append(raw_output)
-        self.hidden = _repackage_var(new_hidden)
+        self.hidden = to_detach(new_hidden)
         return raw_outputs, outputs
 
     def _one_hidden(self, l:int) -> Tensor:

@@ -2,48 +2,119 @@
 title: Making a Release
 ---
 
-## Release Process
+## Project Release Process Overview
 
 Use this section if you know what you're doing for a quick release, otherwise first explore the sections below to understand what each `make` target does.
 
-The es sense of the process is simple - bump the version number, build and upload the packages for conda and pypi. All the other steps handle various other things like tagging, testing the code base, testing the installability of the packages, etc.
+You can run `make help` or just `make` to find out what targets are available and what they do.
+
+If for some reason you can't use `make`, remember that it is just a front-end for the normal `git` and other commands, so you can always make a release without using `make`.
+
+The essence of the process is simple - bump the version number, build and upload the packages for conda and pypi. All the other steps handle various other things like tagging, testing the code base, testing the installability of the packages, etc.
 
 Note, that the release process uses the master branch and also creates and uses a `release-$(version)` branch. That release branch remains after the release so that it's accessible from github as a release branch.
 
 The exact order to be followed is essential.
 
-### Quick process
 
-Here is the quick version that includes all the steps w/o the explanations.
+
+## One Time Preparation
+
+You can skip this step if you have done it once already on the system you're making the release from.
+
+1. You need to register (free) with:
+
+    - [PyPI](https://pypi.org/account/register/)
+    - [TestPyPI](https://test.pypi.org/account/register/)
+    - [anaconda.org](https://anaconda.org/)
+
+    After registration, to upload to fastai project, you will need to ask Jeremy to add your username to PyPI and anaconda.
+
+2. Create file `~/.pypirc` with the following content:
+
+    ```
+    [distutils]
+    index-servers =
+      pypi
+      testpypi
+
+    [testpypi]
+    repository: https://test.pypi.org/legacy/
+    username: your testpypi username
+    password: your testpypi password
+
+    [pypi]
+    username: your pypi username
+    password: your pypi password
+    ```
+
+3. You can also setup your client to have transparent access to anaconda tools, see https://anaconda.org/YOURUSERNAME/settings/access (adjust the url to insert your username).
+
+    You don't really need it, as the anaconda client cashes your credentials so you need to login only infrequently.
+
+
+
+
+
+## Quick Release Process
+
+Here is the quick version that includes all the steps w/o the explanations. If you're unfamiliar with this process use the next section instead.
 
 ```
+make tools-update
 make master-branch-switch
 make bump && make release-branch-create && make commit-version
 make master-branch-switch && make bump-dev && make commit-dev-cycle-push
 make prev-branch-switch && make test && make commit-tag-push
-make release && make test-install
+make dist && make release
+```
+
+Now wait a few minutes for the pypi/conda servers to make the new packages visible to the clients and then:
+
+```
+make test-install
+make backport-check
+
+```
+
+If the `make backport-check` target says you need to backport, proceed to the [backporting section](#backporting-release-branch-to-master). This stage can't be fully automated since it requires you to decide what to backport if anything.
+
+
+```
 make master-branch-switch
 ```
 
-### Step-by-step process
 
-Here is the step-by-step version
 
-The starting point of the workflow is a dev version of the master branch. For this example we will use `1.0.6.dev0`.
 
-1. make sure we start with master branch
+
+## Step-by-step Release Process
+
+This is a one-step at a time process. If you find any difficulties scroll down to [Detailed Release Process](#detailed-release-process), which goes into many more details and explanations.
+
+The starting point of the workflow is a dev version of the master branch. For this process we will use `1.0.6.dev0` starting point as an example.
+
+
+
+1. install the latest tools that will be used during the build
+
+    ```
+    make tools-update            # update pip/conda build tools
+    ```
+
+2. make sure we start with master branch
 
     ```
     make master-branch-switch    # git checkout master
     ```
 
-2. check-dirty - git cleanup/stash/commit so there is nothing in the way
+3. check-dirty - git cleanup/stash/commit so there is nothing in the way
 
     ```
     make git-not-dirty || echo "Commit changes before proceeding"
     ```
 
-3. pick a starting point
+4. pick a starting point
 
     Normally, `git pull` to HEAD is fine, but it's the best to know which 'stable' <commit sha1> to use as a starting point.
 
@@ -55,7 +126,7 @@ The starting point of the workflow is a dev version of the master branch. For th
     git checkout <commit>
     ```
 
-4. start release-$(version) branch
+5. start release-$(version) branch
 
 
     ```
@@ -64,7 +135,7 @@ The starting point of the workflow is a dev version of the master branch. For th
     make commit-version           # git commit fastai/version.py
     ```
 
-5. go back to master and bump it to the next version + .dev0
+6. go back to master and bump it to the next version + .dev0
 
 
     ```
@@ -78,96 +149,189 @@ The starting point of the workflow is a dev version of the master branch. For th
     make commit-dev-cycle-push    # git commit fastai/version.py CHANGES.md; git push
     ```
 
-6. now we are no longer concerned with master, all the rest of the work is done on release-$(version) branch (we are using `git checkout -` here (like in `cd -`, since we no longer have the previous version)
+7. now we are no longer concerned with master, all the rest of the work is done on release-$(version) branch (we are using `git checkout -` here (like in `cd -`, since we no longer have the previous version)
 
     ```
     make prev-branch-switch       # git checkout - (i.e. release-1.0.6 branch)
     ```
 
-7. finalize CHANGES.md (remove empty items) - version and date (could be automated)
+8. finalize CHANGES.md (remove empty items) - version and date (could be automated)
 
-8. validate quality
+9. validate quality
 
     ```
     make test                     # py.test tests
     ```
 
-9. git tag with version, commit and push CHANGES.md and version.py
+10. git tag with version, commit and push CHANGES.md and version.py
 
     ```
     make commit-tag-push          # git commit CHANGES.md; git tag; git push
     ```
 
-10. build and upload packages
+11. build the packages. Note that this step can take a very long time (15 mins or more). It's important that before you run it you remove or move away any large files or directories that aren't part of the release (e.g. `data`, `tmp`, `models`, and `checkpoints`), and move them back when done.
 
     ```
-    make release                  # make dist; make release-pypi; make release-conda
+    make dist                     # make dist-pypi; make dist-conda
     ```
 
-11. test uploads by installing them (telling the installers to install the exact version we uploaded)
+    This target is composed of the two individual targets listed above, so if anything goes wrong you can run them separately.
+
+12. upload packages.
+
+    ```
+    make release                  # make release-pypi; make release-conda
+    ```
+
+    This target is composed of the two individual targets listed above, so if anything goes wrong you can run them separately.
+
+13. test uploads by installing them (telling the installers to install the exact version we uploaded). Allow a few minutes since `make release` for the servers to update their index. If this target fails because it can't find the newly released package, try again in a few minutes.
 
     ```
     make test-install             # pip install fastai==1.0.6; pip uninstall fastai
                                   # conda install -y -c fastai fastai==1.0.6
     ```
 
-12. leave this branch to be indefinitely, and switch back to master:
+14. if some problems were detected during the release process, or something was committed by mistake into the release brach, and as a result changes were made to the release branch, merge those back into the master branch. Except for the version change in `fastaai/version.py`.
+
+    1. check whether anything needs to be backported
+
+    ```
+    make backport-check
+    ```
+
+    If the `make backport-check` target says you need to backport, proceed to the [backporting section](#backporting-release-branch-to-master). This stage can't be fully automated since it requires you to decide what to backport if anything.
+
+
+15. leave this branch to be indefinitely, and switch back to master, so that you won't be mistakenly committing to the release branch when you intended `master`:
 
     ```
     make master-branch-switch     # git checkout master
     ```
 
-13. if some problems were detected during the release and patches were made, merge those back into the master branch.
+
+### Backporting release Branch To master
+
+#### Discovery Process Quick Version
+
+Check whether there any commits besides `fastai/version.py` from the point of branching of release-1.0.6 till its HEAD. If there are then probably there are things to backport.
+
+   ```
+   make backport-check
+   ```
+If the result is "Nothing to backport", you're done. Otherwise proceed to the "Performing Backporting" section below.
+
+If by any chance you switched to the master branch already, this target won't work, since it relies on `fastai/version.py` from the release branch. So you need to do it manually, by either going back to it, if it was the last one:
+
+   ```
+   git checkout -
+   ```
+
+or typing it out:
+
+   ```
+   git checkout release-1.0.6
+   ```
 
 
-## Project Publish (Detailed)
+
+#### Discovery Process Detailed Version
+
+Normally you should have just one commit where `fastai/version.py` is changed, but if you applied some fixes there will be other commits. So we can't just merge the whole branch back into the master but need to cherry-pick all but the very first (version.py change commit, which `make backport-check` will already exclude from its report).
+
+
+Find what needs to be backported, there are a few ways to approach it:
+
+* find the revision at which release-$(version) branched off
+
+    ```
+    git rev-parse --short $(git merge-base master origin/release-1.0.6)
+    ```
+
+* same, but with the long commit revision
+
+    ```
+    git merge-base master origin/release-1.0.6
+    ```
+
+* get list of commits between the branching point and the HEAD of the branch
+
+    ```
+    git log  --oneline $(git merge-base --fork-point master origin/release-1.0.6)..origin/release-1.0.6
+    ```
+
+* get the diff of commits between the branching point and the HEAD of the branch
+    ```
+    git diff $(git merge-base --fork-point master origin/release-1.0.6)..origin/release-1.0.6
+    ```
+
+* alternative GUI way: checking what needs to be backported on github
+
+    If you want to use github presentation, go to the comparison page for the tag of the release https://github.com/fastai/fastai/compare/release-1.0.6 or the same in 3 click if you don't want to manually create it:
+
+    1. go to https://github.com/fastai/fastai
+    2. select the release branch in the left upper-ish corner
+    3. click 'Compare' in the right upper-ish corner
+
+If you are trying to do this process some time after release since you remembered you didn't backport something, do the same as above but first sync your git db:
+
+   ```
+   git fetch --all # update remote info
+   git branch -a   # check which branches are visible
+   ```
+
+
+#### Performing Backporting
+
+Now that you looked at any changes that were applied to the release branch since it was branched, besides the version change in `fastai/version.py`, you can cherry pick the desired changes and merge them into master.
+
+First, switch to master:
+
+   ```
+   make master-branch-switch
+   ```
+
+If `make backport-check` gave you the following output:
+
+   ```
+   !!! These commits may need to be backported:
+
+   ab345fe conda build fix
+   62091ed update release
+   ```
+
+and you decided you wanted to backport both changes, then you can do that one by one:
+
+   ```
+   git show 62091ed        # check that this is the right rev
+   git cherry-pick 62091ed # merge it into the current checkout
+   ```
+
+or if there is a contiguous sequence, you can specify the start and the end (end being on top).
+
+   ```
+   git cherry-pick 62091ed..ab345fe # merge it into the current checkout
+   ```
+
+When done, complete the backporting
+
+   ```
+   git commit -m "backporting from release branch to master"
+   git push
+   ```
+
+
+
+
+
+
+## Detailed Release Process
 
 
 The following is needed if the combined release instructions are failing or better understanding is needed. So that each step can be done separately.
 
 `fastai` package is distributed via [PyPI](https://pypi.org/) and [anaconda](https://anaconda.org/). Therefore we need to make two different builds and upload them to their respective servers upon a new release.
 
-
-
-
-### Prep
-
-1. You need to register (free) with:
-
-    - [PyPI](​https://pypi.org/account/register/)
-    - [TestPyPI](https://test.pypi.org/account/register/)
-    - [anaconda.org](​https://anaconda.org/​)
-
-    After registration, to upload to fastai project, you will need to ask Jeremy to add your username to PyPI and anaconda.
-
-2. Create file `~/.pypirc` with the following content:
-
-    ```
-    [distutils]
-    index-servers#
-    pypi
-    testpypi
-
-    [testpypi]
-    repository: https://test.pypi.org/legacy/
-    username: your testpypi username
-    password: your testpypi password
-
-    [pypi]
-    username: your testpypi username
-    password: your testpypi password
-    ```
-
-3. You can also setup your client to have transparent access to anaconda tools, see https://anaconda.org/YOURUSERNAME/settings/access (adjust the url to insert your username).
-
-    You don't really need it, as the anaconda client cashes your credentials so you need to login only infrequently.
-
-4. Install build tools:
-
-    ```
-    conda install conda-verify conda-build anaconda-client
-    pip install twine>=1.12
-    ```
 
 ### Test Suite
 
@@ -188,7 +352,7 @@ When building a `fastai` conda package, it runs a basic `import fastai` test in 
 
 
 
-### PyPI build and release details
+### PyPI Build and Release Details
 
 To build a PyPI package and release it on [pypi.org/](https://pypi.org/project/fastai/):
 
@@ -221,7 +385,7 @@ To build a PyPI package and release it on [pypi.org/](https://pypi.org/project/f
     If the install is not working, check the state of the package: [https://pypi.org/project/fastai/](https://pypi.org/project/fastai/)
 
 
-#### Even more details
+#### Even More Details
 
 
 * Build Source distribution / Source Release
@@ -233,6 +397,16 @@ To build a PyPI package and release it on [pypi.org/](https://pypi.org/project/f
     ```
     python setup.py sdist
     ```
+
+    `MANIFEST.in` is in charge of what source files are included in the package. If you want to include the whole directory `tests`, but not `tests/data` for example, adjust `MANIFEST.in` to have:
+
+    ```
+    recursive-include tests *
+    prune tests/data
+
+    ```
+
+    For more details, see [Creating a Source Distribution](https://docs.python.org/3/distutils/sourcedist.html)
 
 *  Build Built Distribution
 
@@ -263,6 +437,16 @@ To build a PyPI package and release it on [pypi.org/](https://pypi.org/project/f
     ```
     pip wheel . -w dist
     ```
+
+* `setup.py` configuration:
+
+   * [PEP 459 -- Standard Metadata Extensions for Python Software Packages](https://www.python.org/dev/peps/pep-0459/)
+
+   * [PEP 426 -- Metadata for Python Software Packages 2.0](https://www.python.org/dev/peps/pep-0426/)
+
+   * [Additional meta-data](https://docs.python.org/3/distutils/setupscript.html#additional-meta-data)
+
+
 
 
 #### Pip Helper Tools
@@ -330,7 +514,7 @@ To build a PyPI package and release it on [pypi.org/](https://pypi.org/project/f
 
 
 
-### Conda build details
+### Conda Build Details
 
 To build a Conda package and release it on [anaconda.org](https://anaconda.org/fastai/fastai):
 
@@ -358,7 +542,7 @@ To build a Conda package and release it on [anaconda.org](https://anaconda.org/f
     conda install -c fastai fastai
     ```
 
-#### More detailed version
+#### More Detailed Version
 
 `conda-build` uses a build recipe `conda/meta.yaml`.
 
@@ -443,7 +627,7 @@ and then validate that the installation works correctly:
 conda install -c fastai fastai
 ```
 
-##### Test Release
+##### Testing Release
 
 If this is just a test release that shouldn't be visible to all, add the `--label test` option, like so:
 
@@ -495,13 +679,17 @@ Now you need to rebuild the package, and if you changed the `number` to `2`, the
 
 #### Conda Helper Tools
 
+* `conda-build` useful options
+
+   Sometimes it helps to see what `conda-build` copied into its work folder, so there is a currently not working ` --keep-old-work` option that is supposed to do that. Until it's fixed there `--dirty` which is somewhat similar, but you have clear out `/path/to/anaconda3/envs/your-env/conda-bld/` manually before using it 2nd time - if you don't it will not sync the changes in the source tree.
+
 * To render the final `meta.yaml`:
 
     ```
     conda-render ./conda/
     ```
 
-This is very useful when you do any `jinja2` template processing inside `meta.yaml` and you want to see what the final outcome is.
+    This is very useful when you do any `jinja2` template processing inside `meta.yaml` and you want to see what the final outcome is.
 
 * Once the package is built, it can be validated:
 
@@ -514,70 +702,6 @@ This is very useful when you do any `jinja2` template processing inside `meta.ya
     ```
     conda-verify ./conda/
     ```
-
-* To find out the dependencies of the package:
-
-    ```
-    conda search --info -c fastai fastai
-    ```
-
-    Another hacky way to find out what the exact dependencies for a given conda package (added `-c fastai/label/test` to make it check our test package):
-
-    ```
-    conda create --dry-run --json -n dummy fastai -c fastai
-    ```
-
-* Other `conda search` tricks:
-
-  `conda search` outputs results as following:
-
-    ```
-    conda search -c pytorch "pytorch-nightly"
-    Loading channels: done
-    # Name                  Version           Build                   Channel
-    pytorch-nightly 0.5.0.dev20180914 py3.5_cpu_0                     pytorch
-    pytorch-nightly 0.5.0.dev20180914 py3.5_cuda8.0.61_cudnn7.1.2_0   pytorch
-    pytorch-nightly 0.5.0.dev20180914 py3.5_cuda9.0.176_cudnn7.1.2_0  pytorch
-    pytorch-nightly 0.5.0.dev20180914 py3.5_cuda9.2.148_cudnn7.1.4_0  pytorch
-    [...]
-    ```
-
-    To narrow the results, e.g. show only python3 cpu builds:
-
-    ```
-    conda search -c pytorch "pytorch-nightly[build=py3*_cpu_0]"
-    ```
-
-    and then feed it to `conda install` with specific `==version=build` after the package name, e.g. `pytorch-nightly==1.0.0.dev20180916=py3.6_cpu_0`
-
-
-    To search for packages for a given system (by default, packages for your current
-platform are shown):
-
-    ```
-    conda search -c pytorch "pytorch-nightly[subdir=osx-64]"
-    ```
-
-    Some of the possible platforms include `linux-32`, `linux-64`, `win-64`, `osx-64`.
-
-    And these can be combined:
-
-    ```
-    conda search -c pytorch "pytorch-nightly[subdir=osx-64, build=py3.7*]"
-    ```
-
-    To search all packages released by user `fastai`:
-
-    ```
-    conda search -c fastai --override
-    ```
-
-    To search all packages released by user `fastai` for a specific platform, e.g. `linux-64`:
-
-    ```
-    conda search -c fastai --override --platform linux-64
-    ```
-
 
 #### Documentation
 
@@ -596,7 +720,7 @@ platform are shown):
 
 
 
-### Bump the version
+### Version Bumping
 
 You can either edit `fastai/version.py` and change the version number by hand.
 
@@ -628,7 +752,7 @@ We use the semver version convention w/ python adjustment to `.devX`, instead of
 Remember that master should always have `.dev0` in its version number, e.g. `0.1.10.dev0`. Only the release branch will turn it into `0.1.10`. So when a release is made, master should immediately be switched to `0.1.11.dev0`.
 
 
-### Other Makefile targets
+### Other Makefile Targets
 
 `make clean` removes any intermediary build artifacts.
 
@@ -736,7 +860,7 @@ Useful scripts:
 
 
 
-### Rollback release commit and tag
+### Rollback Release Commit And Tag
 
 In case something is discovered wrong after release commit was made, here is how to rollback.
 
@@ -750,7 +874,7 @@ Careful with this as it'll reset any modified files, probably `git stash` first 
 Once, things were fixed, `git push`, etc...
 
 
-### Run install tests in a fresh environment
+### Run Install Tests In A Fresh Environment
 
 While CI builds now do exactly this, it might be still useful to be able to do it manually, since CI builds are very slow to tweak and experiment with. So here is a quick copy-n-paste recipe to build one and clean it up.
 
@@ -768,7 +892,125 @@ conda deactivate
 conda env remove -y --name fastai-py3.6
 ```
 
-### pip Dependencies
+### Package Dependencies
+
+We need to make sure that `setup.py` sets identical dependencies to `conda/meta.yml`. It's not always possible but it should be attempted.
+
+To find the dependencies of a given package (including the pinned versions), using `spacy` as an example:
+
+* Conda:
+   ```
+   conda search --info spacy==2.0.16
+   ```
+
+* Pypi:
+
+   Currently it can't be done without first installing the package. And you need to install `pipdeptree` that shows the complete requirements and not just the installed versions.
+
+   ```
+   pip install pipdeptree
+   pip install spacy==2.0.16
+   pipdeptree --packages spacy
+   ```
+
+The following sections go into pip/conda-specific tools and methods for figuring out and resolving dependencies.
+
+#### Conda Dependencies
+
+
+* To find out the dependencies of the package:
+
+    ```
+    conda search --info spacy=2.0.16
+    ```
+
+    Narrow down to a specific platform build:
+
+    ```
+    conda search --info spacy=2.0.16=py37h962f231_0
+    ```
+
+    Also can use a wildcard:
+
+    ```
+    conda search --info spacy=2.0.16=py37*
+    ```
+
+    It supports -c channel, for packages not in a main channel
+
+    ```
+    conda search --info -c fastai fastai=1.0.6
+    ```
+
+    If version is not specified it'll show that information on all the versions it has:
+
+    ```
+    conda search --info -c fastai fastai
+    ```
+
+    Another hacky way to find out what the exact dependencies for a given conda package are:
+
+    ```
+    conda create --dry-run --json -n dummy fastai -c fastai
+    ```
+
+    Add `-c fastai/label/test` to make it check our test package.
+
+* Other `conda search` tricks:
+
+  `conda search` outputs results as following:
+
+    ```
+    conda search -c pytorch "pytorch-nightly"
+    Loading channels: done
+    # Name                  Version           Build                   Channel
+    pytorch-nightly 0.5.0.dev20180914 py3.5_cpu_0                     pytorch
+    pytorch-nightly 0.5.0.dev20180914 py3.5_cuda8.0.61_cudnn7.1.2_0   pytorch
+    pytorch-nightly 0.5.0.dev20180914 py3.5_cuda9.0.176_cudnn7.1.2_0  pytorch
+    pytorch-nightly 0.5.0.dev20180914 py3.5_cuda9.2.148_cudnn7.1.4_0  pytorch
+    [...]
+    ```
+
+    To narrow the results, e.g. show only python3 cpu builds:
+
+    ```
+    conda search -c pytorch "pytorch-nightly[build=py3*_cpu_0]"
+    ```
+
+    and then feed it to `conda install` with specific `==version=build` after the package name, e.g. `pytorch-nightly==1.0.0.dev20180916=py3.6_cpu_0`
+
+
+    To search for packages for a given system (by default, packages for your current
+platform are shown):
+
+    ```
+    conda search -c pytorch "pytorch-nightly[subdir=osx-64]"
+    ```
+
+    Some of the possible platforms include `linux-32`, `linux-64`, `win-64`, `osx-64`.
+
+    And these can be combined:
+
+    ```
+    conda search -c pytorch "pytorch-nightly[subdir=osx-64, build=py3.7*]"
+    ```
+
+    To search all packages released by user `fastai`:
+
+    ```
+    conda search -c fastai --override
+    ```
+
+    To search all packages released by user `fastai` for a specific platform, e.g. `linux-64`:
+
+    ```
+    conda search -c fastai --override --platform linux-64
+    ```
+
+
+
+
+#### PyPI Dependencies
 
 Tools for finding out pip dependencies (direct and reversed).
 
@@ -799,7 +1041,7 @@ Tools for finding out pip dependencies (direct and reversed).
 
 
 
-### Creating requirements.txt file by analyzing the code base
+### Creating requirements.txt File By Analyzing The Code Base
 
 We will use 2 tools, each not finding all packages, but together they get it mostly right. So we run both and combine their results.
 
@@ -864,20 +1106,16 @@ By default it runs the fastai installation and a few basic tests when either `ma
   * 'Pause builds' which may be important...
   * Status Badge MD code for the `README.md` project page
 
-To see various stats/graphs based on tests outcome, go to [Runs](https://dev.azure.com/fastdotai/fastai/_TestManagement/Runs?runId=1&_a=runCharts)
+To see various stats/graphs based on tests outcome, go to [Test Plans] => [Runs].
 
 Under Project Settings, important things are:
 
-* [Notifications](https://dev.azure.com/fastdotai/fastai/_settings/notifications)
+* [Notifications]
 
 
 #### CI Builds
 
-CI Builds are triggered every time a commit is pushed into the master (except when it's an obvious document only change commit, like a change to an `.md` file).
-
-To trigger a manual build of go to [Builds](https://dev.azure.com/fastdotai/fastai/_build), choose Queue, choose the branch (`master`) and enter the commit hash (most likely of the latest commit). This is the way to get occasional CI builds against non-master branches.
-
-
+CI Builds are triggered on every `git push` to master (except when it's an obvious document only change commit, like a change to an `.md` file).
 
 
 #### PR Builds
@@ -891,6 +1129,15 @@ Note, that neither green or red status of the PR guarantees that it's so. Since 
 Currently we don't have the following enforcement enabled ([PR won't be merge-able at github](https://help.github.com/articles/about-required-status-checks/
 ) if the PR's build status is failed.)
 
+
+#### Manual Jobs
+
+To trigger a manual build of go to [Builds](https://dev.azure.com/fastdotai/fastai/_build), choose Queue, choose the branch (`master`) and in the Commit field either nothing or enter the desired commit hash. This is the way to get occasional CI builds against non-master branches, which is useful when testing a new pipeline.
+
+
+#### Scheduled Jobs
+
+If you want to run a build as a cron-job, rather than it getting triggered by a PR or a push, add the pipeline script as normal, and then go to that build's [Edit], and then [Triggers], disable CI and PR entries and configure a scheduled entry.
 
 
 #### Modifying `azure-pipelines.yml`
@@ -908,9 +1155,9 @@ And remember to sync the branch with the master changes so that you're testing t
 
 - [pipelines cookbook](https://docs.microsoft.com/en-us/azure/devops/pipelines/languages/python?view=vsts)
 
-- azure [installed automatically @github webhooks](https://github.com/fastai/fastai/settings/hooks) these push events:
+- azure installed automatically via github's project webhooks these push events:
 
-   * triggers CI build on every non-document commit!:
+   * triggers CI build on every push (except when it's only doc change)!:
 
     ```
     https://dev.azure.com/fastdotai/_apis/public/hooks/externalEvents (push)
@@ -919,6 +1166,12 @@ And remember to sync the branch with the master changes so that you're testing t
     ```
     https://dev.azure.com/fastdotai/_apis/public/hooks/externalEvents (pull_request)
     ```
+
+
+#### Multiple Pipelines In The Same Repo
+
+Currently [New] will not let you choose an alternative pipeline. So until this is fixed, let it use the default `azure-pipelines.yml`, Save and then go and Edit it and replace with a different file from the repository (and perhaps switching to a different branch if needed), using [...].
+
 
 
 
