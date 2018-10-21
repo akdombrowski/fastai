@@ -9,7 +9,7 @@ channels:
 - peterjc123
 dependencies:
 - scipy
-- cuda90
+- cuda92
 - cudnn
 - numpy
 - pillow
@@ -91,13 +91,14 @@ dependencies:
 - widgetsnbextension
 - xz
 - zeromq
-- pytorch<0.4
+- pytorch>=0.4.1
+- pytorch-nightly
 - bcolz
 - prompt_toolkit
 #- pytest
 - cython
 - pip:
-  - torchvision>=0.1.9
+  - torchvision>=0.2.1
   - opencv-python
   - isoweek
   - pandas_summary==0.0.5
