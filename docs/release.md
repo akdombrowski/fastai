@@ -58,15 +58,26 @@ You can skip this step if you have done it once already on the system you're mak
 
 ## Quick Release Process
 
+
+Here is the "I'm feeling lucky" version, do not attempt unless you understand the build process.
+
+```
+make release
+make post-release-checks
+```
+
 Here is the quick version that includes all the steps w/o the explanations. If you're unfamiliar with this process use the next section instead.
 
 ```
 make tools-update
 make master-branch-switch
-make bump && make release-branch-create && make commit-version
-make master-branch-switch && make bump-dev && make commit-dev-cycle-push
+make bump && make changes-finalize
+make release-branch-create && make commit-version
+make master-branch-switch
+make bump-dev && make changes-dev-cycle
+make commit-dev-cycle-push
 make prev-branch-switch && make test && make commit-tag-push
-make dist && make release
+make dist && make upload
 ```
 
 Now wait a few minutes for the pypi/conda servers to make the new packages visible to the clients and then:
@@ -131,6 +142,17 @@ The starting point of the workflow is a dev version of the master branch. For th
 
     ```
     make bump                     # 1.0.6.dev0 => 1.0.6
+    ```
+
+The following will fix the version and the date in `CHANGES.md`, you may want to check that it looks tidy.
+
+    ```
+    make changes-finalize         # 1.0.6.dev0 (WIP) => 1.0.6 (date)
+    ```
+
+We are ready to make the new release branch:
+
+    ```
     make release-branch-create    # git checkout -b release-1.0.6
     make commit-version           # git commit fastai/version.py
     ```
@@ -143,7 +165,10 @@ The starting point of the workflow is a dev version of the master branch. For th
     make bump-dev                 # 1.0.6 => 1.0.7.dev0
     ```
 
-    edit CHANGES.md - copy the template and start a new entry for the new version (XXX: could be automated)
+    Insert a new template into `CHANGES.md for the dev cycle with new version number:
+    ```
+    make changes-dev-cycle        # inserts new template + version
+    ```
 
     ```
     make commit-dev-cycle-push    # git commit fastai/version.py CHANGES.md; git push
@@ -180,12 +205,12 @@ The starting point of the workflow is a dev version of the master branch. For th
 12. upload packages.
 
     ```
-    make release                  # make release-pypi; make release-conda
+    make upload                  # make upload-pypi; make upload-conda
     ```
 
     This target is composed of the two individual targets listed above, so if anything goes wrong you can run them separately.
 
-13. test uploads by installing them (telling the installers to install the exact version we uploaded). Allow a few minutes since `make release` for the servers to update their index. If this target fails because it can't find the newly released package, try again in a few minutes.
+13. test uploads by installing them (telling the installers to install the exact version we uploaded). Allow a few minutes since `make upload` for the servers to update their index. If this target fails because it can't find the newly released package, try again in a few minutes.
 
     ```
     make test-install             # pip install fastai==1.0.6; pip uninstall fastai
@@ -257,12 +282,12 @@ Find what needs to be backported, there are a few ways to approach it:
 * get list of commits between the branching point and the HEAD of the branch
 
     ```
-    git log  --oneline $(git merge-base --fork-point master origin/release-1.0.6)..origin/release-1.0.6
+    git log  --oneline $(git merge-base master origin/release-1.0.6)..origin/release-1.0.6
     ```
 
 * get the diff of commits between the branching point and the HEAD of the branch
     ```
-    git diff $(git merge-base --fork-point master origin/release-1.0.6)..origin/release-1.0.6
+    git diff $(git merge-base master origin/release-1.0.6)..origin/release-1.0.6
     ```
 
 * alternative GUI way: checking what needs to be backported on github
@@ -365,7 +390,7 @@ To build a PyPI package and release it on [pypi.org/](https://pypi.org/project/f
 2. Publish:
 
     ```
-    make release-pypi
+    make upload-pypi
     ```
 
     Note: PyPI won't allow re-uploading the same package filename, even if it's a minor fix. If you delete the file from pypi or test.pypi it still won't let you do it. So either a patch-level version needs to be bumped (A.B.C++) or some [post release string added](https://www.python.org/dev/peps/pep-0440/#post-releases) in `version.py`.
@@ -528,7 +553,7 @@ To build a Conda package and release it on [anaconda.org](https://anaconda.org/f
 2. Upload
 
     ```
-    make release-conda
+    make upload-conda
 
     ```
 
@@ -545,6 +570,9 @@ To build a Conda package and release it on [anaconda.org](https://anaconda.org/f
 #### More Detailed Version
 
 `conda-build` uses a build recipe `conda/meta.yaml`.
+
+Note, that `conda-build` recipe now relies on `sdist` generated tarball, so you need to run: `python setup.py sdist` or `make dist-pypi-sdist` if you plan on using the raw `conda-build` commands. Otherwise, `make dist-conda` already does it all for you. Basically it expects the clean tarball with source under `./dist/`.
+
 
 1. Check that it's valid:
 
@@ -566,6 +594,12 @@ To build a Conda package and release it on [anaconda.org](https://anaconda.org/f
 
     it indicates that these packages are not in the specified via `-c` and user-pre-configured conda channels. Follow the instructions in the section `Dealing with Missing Conda Packages` and then come back to the current section and try to build again.
 
+    Note, that `conda-build` recipe now relies on tarball produced by `dist-pypi-sdist` target (it happens internally if you rely on `Makefile`, but if you do it without using `make`, then make sure you built the `sdist` tarball first, which is done by:
+
+    ```
+    python setup.py sdist
+    ```
+    which generates `dist/fastai-$version.tar.gz`, and this is what `conda-build` recipe needs. It's important to remember that if you change any files, you must rebuild the tarball, otherwise `conda-build` will be using the outdated files. If you do `make dist-conda` then it'll be taken care of automatically.
 
 
 
@@ -917,23 +951,30 @@ The following sections go into pip/conda-specific tools and methods for figuring
 
 #### Conda Dependencies
 
+Here is how you can find out currently installed packages and conda dependencies:
 
-* To find out the dependencies of the package:
+* To find out the currently installed version of a package:
 
     ```
-    conda search --info spacy=2.0.16
+    conda list spacy
+    ```
+
+* To find out the dependencies of a package:
+
+    ```
+    conda search --info spacy==2.0.16
     ```
 
     Narrow down to a specific platform build:
 
     ```
-    conda search --info spacy=2.0.16=py37h962f231_0
+    conda search --info spacy==2.0.16=py37h962f231_0
     ```
 
     Also can use a wildcard:
 
     ```
-    conda search --info spacy=2.0.16=py37*
+    conda search --info spacy==2.0.16=py37*
     ```
 
     It supports -c channel, for packages not in a main channel
@@ -955,6 +996,20 @@ The following sections go into pip/conda-specific tools and methods for figuring
     ```
 
     Add `-c fastai/label/test` to make it check our test package.
+
+
+Here is the full Conda packages version specification table:
+
+Constraint type         | Specification       | Result
+------------------------|---------------------|-----------------------------------
+Fuzzy                   |numpy=1.11           |1.11.0, 1.11.1, 1.11.2, 1.11.18 etc.
+Exact                   |numpy==1.11          |1.11.0
+Greater than or equal to|"numpy>=1.11"        |1.11.0 or higher
+OR                      |"numpy=1.11.1|1.11.3"|1.11.1, 1.11.3
+AND                     |"numpy>=1.8,<2"      |1.8, 1.9, not 2.0
+
+
+
 
 * Other `conda search` tricks:
 
@@ -1012,10 +1067,19 @@ platform are shown):
 
 #### PyPI Dependencies
 
-Tools for finding out pip dependencies (direct and reversed).
+Tools for finding out currently installed packages and pip dependencies (direct and reversed).
 
 
-* `pipdeptree`: `pip install pipdeptree`
+* `pipdeptree`: (`pip install pipdeptree`)
+
+    For a specific package:
+    ```
+    pipdeptree --packages  pillow
+    ```
+    or with more details:
+    ```
+    pip show pillow
+    ```
 
     Print the whole tree of the installed base:
     ```
