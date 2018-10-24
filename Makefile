@@ -7,6 +7,7 @@
 
 version_file = fastai/version.py
 version = $(shell python setup.py --version)
+cur_branch = $(shell git branch | sed -n '/\* /s///p')
 
 .DEFAULT_GOAL := help
 
@@ -113,7 +114,22 @@ tools-update: ## install/update build tools
 	conda install -y conda-verify conda-build anaconda-client
 	pip install -U twine
 
-release: | tools-update master-branch-switch bump changes-finalize release-branch-create commit-version master-branch-switch bump-dev changes-dev-cycle commit-dev-cycle-push prev-branch-switch test commit-tag-push dist upload ## do it all (other than testing)
+release: ## do it all (other than testing)
+	${MAKE} tools-update
+	${MAKE} master-branch-switch
+	${MAKE} bump
+	${MAKE} changes-finalize
+	${MAKE} release-branch-create
+	${MAKE} commit-version
+	${MAKE} master-branch-switch
+	${MAKE} bump-dev
+	${MAKE} changes-dev-cycle
+	${MAKE} commit-dev-cycle-push
+	${MAKE} prev-branch-switch
+	${MAKE} test
+	${MAKE} commit-tag-push
+	${MAKE} dist
+	${MAKE} upload
 
 post-release-checks: | test-install backport-check master-branch-switch ## do post release checks
 
@@ -122,6 +138,7 @@ post-release-checks: | test-install backport-check master-branch-switch ## do po
 
 git-pull: ## git pull
 	@echo "\n\n*** Making sure we have the latest checkout"
+	git checkout master
 	git pull
 	git status
 
@@ -133,47 +150,57 @@ git-not-dirty:
     fi
 
 prev-branch-switch:
-	@echo "*** Switching to prev branch"
+	@echo "*** [$(cur_branch)] Switching to prev branch"
 	git checkout -
+	$(eval branch := $(shell git branch | sed -n '/\* /s///p'))
+	@echo "Now on [$(branch)] branch"
 
 release-branch-create:
-	@echo "*** Creating branch release-$(version)"
+	@echo "*** [$(cur_branch)] Creating release-$(version) branch"
 	git checkout -b release-$(version)
+	$(eval branch := $(shell git branch | sed -n '/\* /s///p'))
+	@echo "Now on [$(branch)] branch"
 
 release-branch-switch:
-	@echo "*** Switching to branch release-$(version)"
+	@echo "*** [$(cur_branch)] Switching to release-$(version) branch"
 	git checkout release-$(version)
+	$(eval branch := $(shell git branch | sed -n '/\* /s///p'))
+	@echo "Now on [$(branch)] branch"
 
 master-branch-switch:
-	@echo "*** Switching to master branch: version $(version)"
+	@echo "*** [$(cur_branch)] Switching to master branch: version $(version)"
 	git checkout master
+	$(eval branch := $(shell git branch | sed -n '/\* /s///p'))
+	@echo "Now on [$(branch)] branch"
 
 commit-dev-cycle-push: ## commit version and CHANGES and push
-	@echo "\n\n*** Start new dev cycle: $(version)"
+	@echo "\n\n*** [$(cur_branch)] Start new dev cycle: $(version)"
 	git commit -m "new dev cycle: $(version)" $(version_file) CHANGES.md
 
-	@echo "\n\n*** Push all changes"
+	@echo "\n\n*** [$(cur_branch)] Push changes"
 	git push
 
 commit-version: ## commit and tag the release
-	@echo "\n\n*** Start release branch: $(version)"
+	@echo "\n\n*** [$(cur_branch)] Start release branch: $(version)"
 	git commit -m "starting release branch: $(version)" $(version_file)
+	$(eval branch := $(shell git branch | sed -n '/\* /s///p'))
+	@echo "Now on [$(branch)] branch"
 
 commit-tag-push: ## commit and tag the release
-	@echo "\n\n*** Commit CHANGES.md"
+	@echo "\n\n*** [$(cur_branch)] Commit CHANGES.md"
 	git commit -m "version $(version) release" CHANGES.md || echo "no changes to commit"
 
-	@echo "\n\n*** Tag $(version) version"
+	@echo "\n\n*** [$(cur_branch)] Tag $(version) version"
 	git tag -a $(version) -m "$(version)" && git push --tags
 
-	@echo "\n\n*** Push all changes"
+	@echo "\n\n*** [$(cur_branch)] Push changes"
 	git push --set-upstream origin release-$(version)
 
 # check whether there any commits besides fastai/version.py and CHANGES.md
 # from the point of branching of release-$(version) till its HEAD. If
 # there are any, then most likely there are things to backport.
 backport-check: ## backport to master check
-	@echo "*** Checking if anything needs to be backported"
+	@echo "*** [$(cur_branch)] Checking if anything needs to be backported"
 	$(eval start_rev := $(shell git rev-parse --short $$(git merge-base master origin/release-$(version))))
 	@if [ ! -n "$(start_rev)" ]; then\
 		echo "*** failed, check you're on the correct release branch";\
@@ -190,6 +217,12 @@ backport-check: ## backport to master check
 ##@ Testing new package installation
 
 test-install: ## test conda/pip package by installing that version them
+	@echo "\n\n*** [$(cur_branch)] Branch check (needing release branch)"
+	@if [ "$(cur_branch)" = "master" ]; then\
+		echo "Error: you are not on the release branch, to switch to it do:\n  git checkout release-1.0.??\nafter adjusting the version number. Also possible that:\n  git checkout - \nwill do the trick, if you just switched from it. And then repeat:\n  make test-install\n";\
+		exit 1;\
+	fi
+
 	@echo "\n\n*** Install/uninstall $(version) pip version"
 	@pip uninstall -y fastai
 	pip install fastai==$(version)
@@ -204,9 +237,11 @@ test-install: ## test conda/pip package by installing that version them
 ##@ CHANGES.md file targets
 
 changes-finalize: ## fix the version and stamp the date
+	@echo "\n\n*** [$(cur_branch)] Adjust '## version (date)' in CHANGES.md"
 	perl -pi -e 'use POSIX qw(strftime); BEGIN{$$date=strftime "%Y-%m-%d", localtime};s|^##.*Work In Progress\)|## $(version) ($$date)|' CHANGES.md
 
 changes-dev-cycle: ## insert new template + version
+	@echo "\n\n*** [$(cur_branch)] Install new template + version in CHANGES.md"
 	perl -0777 -pi -e 's|^(##)|\n\n## $(version) (Work In Progress)\n\n### New:\n\n### Changed:\n\n### Fixed:\n\n\n\n$$1|ms' CHANGES.md
 
 
@@ -215,26 +250,26 @@ changes-dev-cycle: ## insert new template + version
 # Support semver, but using python's .dev0 instead of -dev0
 
 bump-patch: ## bump patch-level unless has .devX, then don't bump, but remove .devX
-	@perl -pi -e 's|((\d+)\.(\d+).(\d+)(\.\w+\d+)?)|$$o=$$1; $$n=$$5 ? join(".", $$2, $$3, $$4) :join(".", $$2, $$3, $$4+1); print STDERR "*** Changing version: $$o => $$n\n"; $$n |e' $(version_file)
+	@perl -pi -e 's|((\d+)\.(\d+).(\d+)(\.\w+\d+)?)|$$o=$$1; $$n=$$5 ? join(".", $$2, $$3, $$4) :join(".", $$2, $$3, $$4+1); print STDERR "\n\n*** [$(cur_branch)] Changing version: $$o => $$n\n"; $$n |e' $(version_file)
 
 bump: bump-patch ## alias to bump-patch (as it's used often)
 
 bump-minor: ## bump minor-level unless has .devX, then don't bump, but remove .devX
-	@perl -pi -e 's|((\d+)\.(\d+).(\d+)(\.\w+\d+)?)|$$o=$$1; $$n=$$5 ? join(".", $$2, $$3, $$4) :join(".", $$2, $$3+1, $$4); print STDERR "*** Changing version: $$o => $$n\n"; $$n |e' $(version_file)
+	@perl -pi -e 's|((\d+)\.(\d+).(\d+)(\.\w+\d+)?)|$$o=$$1; $$n=$$5 ? join(".", $$2, $$3, $$4) :join(".", $$2, $$3+1, $$4); print STDERR "\n\n*** [$(cur_branch)] Changing version: $$o => $$n\n"; $$n |e' $(version_file)
 
 bump-major: ## bump major-level unless has .devX, then don't bump, but remove .devX
-	@perl -pi -e 's|((\d+)\.(\d+).(\d+)(\.\w+\d+)?)|$$o=$$1; $$n=$$5 ? join(".", $$2, $$3, $$4) :join(".", $$2+1, $$3, $$4); print STDERR "*** Changing version: $$o => $$n\n"; $$n |e' $(version_file)
+	@perl -pi -e 's|((\d+)\.(\d+).(\d+)(\.\w+\d+)?)|$$o=$$1; $$n=$$5 ? join(".", $$2, $$3, $$4) :join(".", $$2+1, $$3, $$4); print STDERR "\n\n*** [$(cur_branch)] Changing version: $$o => $$n\n"; $$n |e' $(version_file)
 
 bump-patch-dev: ## bump patch-level and add .dev0
-	@perl -pi -e 's|((\d+)\.(\d+).(\d+)(\.\w+\d+)?)|$$o=$$1; $$n=join(".", $$2, $$3, $$4+1, "dev0"); print STDERR "*** Changing version: $$o => $$n\n"; $$n |e' $(version_file)
+	@perl -pi -e 's|((\d+)\.(\d+).(\d+)(\.\w+\d+)?)|$$o=$$1; $$n=join(".", $$2, $$3, $$4+1, "dev0"); print STDERR "\n\n*** [$(cur_branch)] Changing version: $$o => $$n\n"; $$n |e' $(version_file)
 
 bump-dev: bump-patch-dev ## alias to bump-patch-dev (as it's used often)
 
 bump-minor-dev: ## bump minor-level and add .dev0
-	@perl -pi -e 's|((\d+)\.(\d+).(\d+)(\.\w+\d+)?)|$$o=$$1; $$n=join(".", $$2, $$3+1, $$4, "dev0"); print STDERR "*** Changing version: $$o => $$n\n"; $$n |e' $(version_file)
+	@perl -pi -e 's|((\d+)\.(\d+).(\d+)(\.\w+\d+)?)|$$o=$$1; $$n=join(".", $$2, $$3+1, $$4, "dev0"); print STDERR "\n\n*** [$(cur_branch)] Changing version: $$o => $$n\n"; $$n |e' $(version_file)
 
 bump-major-dev: ## bump major-level and add .dev0
-	@perl -pi -e 's|((\d+)\.(\d+).(\d+)(\.\w+\d+)?)|$$o=$$1; $$n=join(".", $$2+1, $$3, $$4, "dev0"); print STDERR "*** Changing version: $$o => $$n\n"; $$n |e' $(version_file)
+	@perl -pi -e 's|((\d+)\.(\d+).(\d+)(\.\w+\d+)?)|$$o=$$1; $$n=join(".", $$2+1, $$3, $$4, "dev0"); print STDERR "\n\n*** [$(cur_branch)] Changing version: $$o => $$n\n"; $$n |e' $(version_file)
 
 
 ##@ Coverage
