@@ -10,16 +10,33 @@ Note that the top-most release is changes in the unreleased master branch on
 Github. Parentheses after an item show the name or github id of the contributor
 of that change.
 
-
-
-## 1.0.13.dev0 (Work In Progress)
+## 1.0.14.dev0 (Work In Progress)
 
 ### New:
 
 ### Changed:
 
+- master bar support in `download_url`
+- various fixes to support the latest of `fastprogress`
+- `Learner.normalize()` (without args) stores calculated stats in `Learner.stats`
+- `pred_batch` moved to `basic_train` and fixed for multiple inputs
+- `lr_find()` prints the next step to type when completed
+- New version of fastprogress used; doesn't require ipywidgets
+
 ### Fixed:
 
+
+## 1.0.13 (2018-10-24)
+
+### New: 
+
+- pretrained language model is now downloaded directly in the .fastai/models/ folder. Use `pretrained_model=URLs.WT103`
+- add an argument `stop_div` to `Learner.lr_find()` to prevent early stopping, useful for negative losses.
+- add an argument `convert_mode` to `open_mask` and `SegmentationDataset` to choose the PIL conversion mode of the masks.
+
+### Changed:
+
+- `URLs.download_wt103()` has been removed
 
 
 ## 1.0.12 (2018-10-23)

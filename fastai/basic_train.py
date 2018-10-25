@@ -167,15 +167,22 @@ class Learner():
         "Save model with `name` to `self.model_dir`."
         torch.save(self.model.state_dict(), self.path/self.model_dir/f'{name}.pth')
 
-    def load(self, name:PathOrStr):
-        "Load model `name` from `self.model_dir`."
-        self.model.load_state_dict(torch.load(self.path/self.model_dir/f'{name}.pth'))
+    def load(self, name:PathOrStr, device:torch.device=None):
+        "Load model `name` from `self.model_dir` using `device`, defaulting to `self.data.device`."
+        if device is None: device = self.data.device
+        self.model.load_state_dict(torch.load(self.path/self.model_dir/f'{name}.pth', map_location=device))
 
+    def pred_batch(self, is_test:bool=False) -> Tuple[Tensors, Tensors, Tensors]:
+        "Return input, target and output of the model on a batch."
+        x,y = next(iter(self.data.holdout(is_test)))
+        return x,y,self.model(*x).detach()
+    
     def get_preds(self, is_test:bool=False) -> List[Tensor]:
         "Return predictions and targets on the valid or test set, depending on `is_test`."
         return get_preds(self.model, self.data.holdout(is_test), cb_handler=CallbackHandler(self.callbacks, []))
     
     def validate(self, dl=None, callbacks=None, metrics=None):
+        "Validate on `dl` with potential `callbacks` and `metrics`."
         dl = ifnone(dl, self.data.valid_dl)
         metrics = ifnone(metrics, self.metrics)
         cb_handler = CallbackHandler(self.callbacks + ifnone(callbacks, []), metrics)
@@ -205,8 +212,8 @@ class Recorder(LearnerCallback):
     def on_train_begin(self, pbar:PBar, metrics_names:Collection[str], **kwargs:Any)->None:
         "Initialize recording status at beginning of training."
         self.pbar = pbar
-        self.names = ['epoch', 'train loss', 'valid loss'] + metrics_names
-        self.pbar.write('  '.join(self.names))
+        self.names = ['epoch', 'train_loss', 'valid_loss'] + metrics_names
+        self.pbar.write('  '.join(self.names), table=True)
         self.losses,self.val_losses,self.lrs,self.moms,self.metrics,self.nb_batches = [],[],[],[],[],[]
 
     def on_batch_begin(self, train, **kwargs:Any)->None:
@@ -240,7 +247,7 @@ class Recorder(LearnerCallback):
             t = str(stat) if isinstance(stat, int) else f'{stat:.6f}'
             t += ' ' * (len(name) - len(t))
             str_stats.append(t)
-        self.pbar.write('  '.join(str_stats))
+        self.pbar.write('  '.join(str_stats), table=True)
         
     def add_metrics(self, metrics):
         self._added_mets = metrics
