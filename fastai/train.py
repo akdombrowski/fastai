@@ -1,7 +1,10 @@
 "Provides advanced training extensions to `fastai.basic_train`. Includes half-precision, learning rate finder, mixup, and one-cycle"
 from .torch_core import *
 from .callbacks import *
+from .basic_data import *
 from .basic_train import *
+from .vision import models,create_body
+from fastai.vision.learner import cnn_config
 
 __all__ = ['BnFreeze', 'GradientClipping', 'ShowGraph', 'fit_one_cycle', 'lr_find', 'one_cycle_scheduler', 'to_fp16', 'mixup']
 
@@ -50,7 +53,7 @@ class ShowGraph(LearnerCallback):
         "If we have metrics plot them in our pbar graph"
         if last_metrics is not None:
             rec = self.learn.recorder
-            iters = list(range(len(rec.losses)))
+            iters = range_of(rec.losses)
             val_iter = np.array(rec.nb_batches).cumsum()
             x_bounds = (0, (n_epochs - len(rec.nb_batches)) * rec.nb_batches[-1] + len(rec.losses))
             y_bounds = (0, max((max(Tensor(rec.losses)), max(Tensor(rec.val_losses)))))
@@ -70,4 +73,19 @@ class GradientClipping(LearnerCallback):
 
     def on_backward_end(self, **kwargs):
         if self.clip:  nn.utils.clip_grad_norm_(self.learn.model.parameters(), self.clip)
+
+@classmethod
+def Learner_create_unet(cls, data:DataBunch, arch:Callable, pretrained:bool=True,
+             split_on:Optional[SplitFuncOrIdxList]=None, **kwargs:Any)->None:
+    "Build Unet learners."
+    meta = cnn_config(arch)
+    body = create_body(arch(pretrained), meta['cut'])
+    model = models.unet.DynamicUnet(body, n_classes=data.c).cuda()
+    learn = cls(data, model, **kwargs)
+    learn.split(ifnone(split_on,meta['split']))
+    if pretrained: learn.freeze()
+    apply_init(model[2], nn.init.kaiming_normal_)
+    return learn
+
+Learner.create_unet = Learner_create_unet
 

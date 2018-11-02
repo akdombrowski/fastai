@@ -7,7 +7,6 @@ warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
 AnnealFunc = Callable[[Number,Number,float], Number]
 ArgStar = Collection[Any]
 BatchSamples = Collection[Tuple[Collection[int], int]]
-Classes = Collection[Any]
 DataFrameOrChunks = Union[DataFrame, pd.io.parsers.TextFileReader]
 FilePathList = Collection[Path]
 Floats = Union[float, Collection[float]]
@@ -38,6 +37,8 @@ StrList = Collection[str]
 Tokens = Collection[Collection[str]]
 OptStrList = Optional[StrList]
 
+np.set_printoptions(precision=6, threshold=50, edgeitems=4, linewidth=120)
+
 def num_cpus()->int:
     "Get number of cpus"
     try:                   return len(os.sched_getaffinity(0))
@@ -56,7 +57,10 @@ def ifnone(a:Any,b:Any)->Any:
     "`a` if `a` is not None, otherwise `b`."
     return b if a is None else a
 
-def uniqueify(x:Series) -> List[Any]: return list(OrderedDict.fromkeys(x).keys())
+def uniqueify(x:Series)->List:
+    "Return unique values of `x`"
+    return list(OrderedDict.fromkeys(x).keys())
+
 def idx_dict(a): return {v:k for k,v in enumerate(a)}
 
 def find_classes(folder:Path)->FilePathList:
@@ -100,7 +104,7 @@ def even_mults(start:float, stop:float, n:int)->np.ndarray:
     return np.array([start*(step**i) for i in range(n)])
 
 def extract_kwargs(names:Collection[str], kwargs:KWArgs):
-    "Extracs the keys in `names` from the `kwargs`."
+    "Extract the keys in `names` from the `kwargs`."
     new_kwargs = {}
     for arg_name in names:
         if arg_name in kwargs:
@@ -108,15 +112,15 @@ def extract_kwargs(names:Collection[str], kwargs:KWArgs):
             new_kwargs[arg_name] = arg_val
     return new_kwargs, kwargs
 
-def partition(a:Collection, sz:int) -> List[Collection]:
+def partition(a:Collection, sz:int)->List[Collection]:
     "Split iterables `a` in equal parts of size `sz`"
     return [a[i:i+sz] for i in range(0, len(a), sz)]
 
-def partition_by_cores(a:Collection, n_cpus:int) -> List[Collection]:
+def partition_by_cores(a:Collection, n_cpus:int)->List[Collection]:
     "Split data in `a` equally among `n_cpus` cores"
     return partition(a, len(a)//n_cpus + 1)
 
-def get_chunk_length(data:Union[PathOrStr, DataFrame, pd.io.parsers.TextFileReader], chunksize:Optional[int] = None) -> int:
+def get_chunk_length(data:Union[PathOrStr, DataFrame, pd.io.parsers.TextFileReader], chunksize:Optional[int] = None)->int:
     "Read the number of chunks in a pandas `DataFrame`."
     if (type(data) == DataFrame):  return 1
     elif (type(data) == pd.io.parsers.TextFileReader):
@@ -126,8 +130,8 @@ def get_chunk_length(data:Union[PathOrStr, DataFrame, pd.io.parsers.TextFileRead
     for _ in dfs: l+=1
     return l
 
-def get_total_length(csv_name:PathOrStr, chunksize:int) -> int:
-    "Read the the total length of a pandas `DataFrame`."
+def get_total_length(csv_name:PathOrStr, chunksize:int)->int:
+    "Read the total length of a pandas `DataFrame`."
     dfs = pd.read_csv(csv_name, header=None, chunksize=chunksize)
     l = 0
     for df in dfs: l+=len(df)
@@ -153,24 +157,36 @@ class ItemBase():
     @abstractmethod
     def data(self): pass
 
-def download_url(url:str, dest:str, overwrite:bool=False, pbar:ProgressBar=None)->None:
-    "Download `url` to `dest` unless is exists and not `overwrite`."
+def download_url(url:str, dest:str, overwrite:bool=False, pbar:ProgressBar=None, show_progress=True)->None:
+    "Download `url` to `dest` unless it exists and not `overwrite`."
     if os.path.exists(dest) and not overwrite: return
     u = requests.get(url, stream=True)
     file_size = int(u.headers["Content-Length"])
     u = u.raw
 
     with open(dest,'wb') as f:
-        pbar = progress_bar(range(file_size), auto_update=False, leave=False, parent=pbar)
+        if show_progress: pbar = progress_bar(range(file_size), auto_update=False, leave=False, parent=pbar)
         nbytes,buffer = 0,[1]
         while len(buffer):
             buffer = u.read(8192)
             nbytes += len(buffer)
-            pbar.update(nbytes)
+            if show_progress: pbar.update(nbytes)
             f.write(buffer)
 
 def range_of(x): return list(range(len(x)))
 def arange_of(x): return np.arange(len(x))
 
-Path.ls = lambda x: [o.name for o in x.iterdir()]
+Path.ls = lambda x: list(x.iterdir())
 
+def join_path(fname:PathOrStr, path:PathOrStr='.')->Path:
+    "Return `Path(path)/Path(fname)`, `path` defaults to current dir."
+    return Path(path)/Path(fname)
+
+def join_paths(fnames:FilePathList, path:PathOrStr='.')->Collection[Path]:
+    "Join `path` to every file name in `fnames`."
+    path = Path(path)
+    return [join_path(o,path) for o in fnames]
+
+def loadtxt_str(path:PathOrStr)->np.ndarray:
+    "Return `ndarray` of `str` of lines of text from `path`."
+    return np.loadtxt(str(path), str)
