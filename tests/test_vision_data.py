@@ -1,5 +1,4 @@
 import pytest
-from fastai import *
 from fastai.vision import *
 from fastai.vision.data import verify_image
 import PIL
@@ -20,7 +19,7 @@ def test_from_folder(path):
 
 def test_from_name_re(path):
     fnames = get_files(path/'train', recurse=True)
-    pat = r'\/([^/]+)\/\d+.png$'
+    pat = r'/([^/]+)\/\d+.png$'
     data = ImageDataBunch.from_name_re(path, fnames, pat, ds_tfms=(rand_pad(2, 28), []))
     mnist_tiny_sanity_test(data)
 
@@ -62,7 +61,7 @@ def test_verify_images(path):
 def test_verify_image(path):
     tmp_path = path/'tmp'
     os.makedirs(tmp_path, exist_ok=True)
-    verify_image(path/'train'/'3'/'867.png',False, dest=tmp_path, max_size=27)
+    verify_image(path/'train'/'3'/'867.png', 0, False, dest=tmp_path, max_size=27)
     img = PIL.Image.open(tmp_path/'867.png')
     assert img.height == 27 and img.width == 27
     shutil.rmtree(tmp_path)

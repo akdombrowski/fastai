@@ -98,7 +98,7 @@ dependencies:
 #- pytest
 - cython
 - pip:
-  - torchvision>=0.2.1
+  - torchvision==0.1.9
   - opencv-python
   - isoweek
   - pandas_summary==0.0.5
