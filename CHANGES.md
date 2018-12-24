@@ -13,11 +13,45 @@ of that change.
 
 
 
-## 1.0.23.dev0 (Work In Progress)
+
+
+
+
+## 1.0.25.dev0 (Work In Progress)
+
+### New:
+
+- `FloatList` to do regression
+
+### Changed:
+
+- Remove `TextFilesList` as you can now use `TextList` instead
+- Consistent use of `cols` / `col` in the data block API depending on if you can pass multiple columns or not
+- Collab is refactored with the data block API behind the scene
+
+### Fixed:
+
+
+
+## 1.0.24 (2018-11-13)
 
 ### New:
 
 ### Changed:
+
+- Big refactor of the data block API
+
+### Fixed:
+
+
+
+## 1.0.23 (2018-11-13)
+
+### New:
+
+### Changed:
+
+- `tools/build-docs` and `tools/update-nbs` scripts combined into one script.
 
 ### Fixed:
 
